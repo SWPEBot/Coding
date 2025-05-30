@@ -1,0 +1,27 @@
+#!/bin/sh
+# Copyright 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+printf "\033[1;32m"
+echo ""
+echo " ########  ##     ## ##         ######  ##      ##"
+echo " ##     ## ##     ## ##    ##  ##    ## ##  ##  ##"
+echo " ##     ## ##     ## ##    ##  ##       ##  ##  ##"
+echo " ########  ##     ## ##    ##   ######  ##  ##  ##"
+echo " ##        ##     ## #########       ## ##  ##  ##"
+echo " ##        ##     ##       ##  ##    ## ##  ##  ##"
+echo " ##         #######        ##   ######   ###  ### "
+echo ""
+vpd -i RW_VPD -O
+echo "RW_VPD Cache is Cleared."
+vpd -i RO_VPD -O
+echo "RW_VPD Cache is Cleared."
+echo ""
+echo "#### ##    ##  ######  ########    ###    ##       ##           ######   #######  ##     ## ########  ##       ######## ######## ########"
+echo " ##  ###   ## ##    ##    ##      ## ##   ##       ##          ##    ## ##     ## ###   ### ##     ## ##       ##          ##    ##      "
+echo " ##  ####  ## ##          ##     ##   ##  ##       ##          ##       ##     ## #### #### ##     ## ##       ##          ##    ##      "
+echo " ##  ## ## ##  ######     ##    ##     ## ##       ##          ##       ##     ## ## ### ## ########  ##       ######      ##    ######  "
+echo " ##  ##  ####       ##    ##    ######### ##       ##          ##       ##     ## ##     ## ##        ##       ##          ##    ##      "
+echo " ##  ##   ### ##    ##    ##    ##     ## ##       ##          ##    ## ##     ## ##     ## ##        ##       ##          ##    ##      "
+echo "#### ##    ##  ######     ##    ##     ## ######## ########     ######   #######  ##     ## ##        ######## ########    ##    ########"
+echo "Factory images installed."
