@@ -1,0 +1,203 @@
+#!/bin/bash
+
+Mount_usb() {
+  sdx=$(ls /dev/sd* | wc -l)
+
+  if [ $sdx -eq 0 -o $sdx -eq 13 ]; then
+    echo "Not found usb device"
+    exit 
+  fi
+
+  for i in /dev/sd{a..z};
+  do
+    mount $i /media 2>/dev/null
+    if [ $? -eq 0 ]; then
+      echo "Found $i device"
+      break
+    fi
+  done
+}
+
+Umount_usb() {
+  sync && umount /media > /dev/null 2>&1
+  echo "Umount the usb device successful"
+}
+
+Factory_bug_to_usb() {
+  times=1
+  sync && umount /media > /dev/null 2>&1
+  sdx=$(ls /dev/sd*)
+
+  if [ $? -ne 0 ]; then
+    echo "Not found usb device"
+    exit 
+  fi
+
+  sn=$(factory device-data -g serials.serial_number)
+  model=$(cros_config / name)
+  skuid=$(cros_config /identity sku-id)
+
+  if [ -z "${sn}" ]; then
+    echo "SN does not exist in the Factory device-data"
+    read -p "Please enter SN:  " sn
+  fi
+
+  read -p "Please enter a description:  " info
+  factory_bug -i ${model}_${skuid}_${sn}_${info} -s > /dev/null 2>&1
+
+  while [ $? -eq 1 ]
+  do
+    echo "File name conflict: ${times} !!!"
+    let times++
+    factory_bug -i ${model}_${skuid}_${sn}_${info}_${times} -s > /dev/null 2>&1
+  done
+}
+
+Check_HWID() {
+  model=$(cros_config / name | tr a-z A-Z)
+  echo $model
+  tmux new -s v -d
+  tmux send-keys "hwid generate --no-verify-checksum" Enter
+  tmux new -s r -d
+  tmux split -h
+  tmux send-keys -t 0 "hwid collect-material | less" Enter
+  tmux send-keys -t 1 "vim /usr/local/factory/hwid/${model}" Enter
+  tmux attach
+}
+
+Check_List() {
+  factory test-list --list
+}
+
+Vim_Main_List() {
+  list=$(factory test-list 2>/dev/null)
+  vim /usr/local/factory/py/test/test_lists/${list}.test_list.json
+}
+
+Cd_List() {
+  tmux new -s cdt -d
+  tmux send-keys "cd /usr/local/factory/py/test/test_lists/" Enter
+  tmux attach
+}
+
+Cd_Py() {
+  tmux new -s cdy -d
+  tmux send-keys "cd /usr/local/factory/py/test/pytests/" Enter
+  tmux attach
+}
+
+Install_toolkit() {
+  Mount_usb
+  rm -rf /usr/local/*.run
+  cp /media/*.run /usr/local/
+  /usr/local/*.run -- --yes
+  sync
+  Umount_usb
+  factory_restart
+}
+
+Factory_restart() {
+  factory_restart -c
+}
+
+Factory_DeviceData() {
+  factory device-data
+}
+
+HWIDDatabase() {
+  echo "Please enter SKU"
+  read sku
+  phase=`factory phase`
+  model=`cros_config / name | tr a-z A-Z`
+  sn=`vpd -g serial_number`
+  mkdir -p /usr/local/${model}_${sn}_${sku}
+  echo "**************************************** Porbe HWID ***********************************************"
+  hwid collect-material > /usr/local/${model}_${sn}_${sku}/${sku}.probe
+  if [ $? -ne 0 ]; then
+     echo "Check hwid probe result"
+  fi
+  echo "**************************************** UpdateDatabase *******************************************"
+  cp /media/hwid_v3_bundle_${model}_*.sh /usr/local/ && bash /usr/local/hwid_v3_bundle_${model}_*.sh
+  hwid update-database -j ${model} -p /usr/local/factory/hwid --image-id ${phase} --material-file /usr/local/${model}_${sn}_${sku}/${sku}.probe --no-verify-checksum
+  if [ $? -ne 0 ]; then
+     echo "Check hwid database"
+  fi
+  echo "**************************************** GenerateDatabase *****************************************"
+  hwid generate --no-verify-checksum > /usr/local/${model}_${sn}_${sku}/${sku}_decode 
+  decode=$(cat /usr/local/KELSIER_0005770BL0_sku3/sku3_decode | grep -i encode | cut -d ':' -f 2 | sed 's/^\s*//;s/\*$//')
+  if [ $? -ne 0 ]; then
+     exit 1
+  fi
+  echo "**************************************** DecodeDatabase *******************************************"
+  hwid decode -p /usr/local/factory/hwid/ --no-verify-checksum "${decode}"
+  echo ${decode}
+  echo "**************************************** DecodeDatabase *******************************************"
+  hwid verify --no-verify-checksum --material-file /usr/local/${model}_${sn}_${sku}/${sku}.probe --phase ${phase} "${decode}"
+  if [ $? -ne 0 ];then
+     exit 1
+  fi
+  echo "************************************** Copy ${sku} Database ***************************************"
+  cp /usr/local/factory/hwid/${model} /media/ && sync && ls /media/ &&  umount /media/
+  
+}
+
+main() {
+  select mode in mount_usb umount_usb factory_bug_to_usb check_hwid check_list vim_main_list cd_list cd_py install_toolkit factory_restart factory_device_data hwid_database
+  do
+    case "${mode}" in 
+      mount_usb)
+        Mount_usb
+        break
+      ;;
+      umount_usb)
+        Umount_usb
+        break
+      ;;
+      factory_bug_to_usb)
+        Factory_bug_to_usb
+        break
+      ;;
+      check_hwid)
+        Check_HWID
+        break
+      ;;
+      check_list)
+        Check_List
+        break
+      ;;
+      vim_main_list)
+        Vim_Main_List
+        break
+      ;;
+      cd_list)
+        Cd_List
+        break
+      ;;
+      cd_py)
+        Cd_Py
+        break
+      ;;
+      install_toolkit)
+        Install_toolkit
+        break
+      ;;
+      factory_restart)
+        Factory_restart
+        break
+      ;;
+      factory_device_data)
+        Factory_DeviceData
+        break
+      ;;
+      hwid_database)
+        HWIDDatabase
+        break
+      ;;
+      *)
+        echo Error
+        break
+    esac
+  done
+}
+
+main"$@"
